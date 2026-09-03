@@ -105,3 +105,4 @@ src/main/resources/static/
 └── js/app.js      UI- und API-Logik
 ```
 
+

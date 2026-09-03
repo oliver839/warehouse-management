@@ -104,3 +104,4 @@ src/main/resources/static/
 ├── css/styles.css Design und Themes
 └── js/app.js      UI- und API-Logik
 ```
+

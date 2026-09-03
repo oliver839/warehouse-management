@@ -1,158 +1,114 @@
-<!DOCTYPE html>
-<html lang="de">
+<!doctype html>
+<html lang="de" data-bs-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Warehouse Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="css/styles.css" rel="stylesheet">
 </head>
 <body>
+<nav class="navbar navbar-expand navbar-glass sticky-top">
+    <div class="container">
+        <a class="navbar-brand d-flex align-items-center gap-2 fw-bold" href="#">
+            <span class="brand-icon"><i class="bi bi-box-seam-fill"></i></span>
+            Warehouse Dashboard
+        </a>
+        <button id="themeToggle" class="btn btn-icon" type="button" aria-label="Darstellung wechseln" title="Darstellung wechseln">
+            <i id="themeToggleIcon" class="bi bi-moon-stars-fill"></i>
+        </button>
+    </div>
+</nav>
 
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
-        <div class="container-fluid px-4">
-            <a class="navbar-brand fw-semibold" href="#">
-                <i class="fa-solid fa-warehouse me-2"></i>Warehouse Dashboard
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="#warehouses-section">
-                            <i class="fa-solid fa-building me-1"></i>Lager
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#items-section">
-                            <i class="fa-solid fa-boxes-stacked me-1"></i>Bestand
-                        </a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
-
-    <main class="container-fluid px-4 py-4">
-
-        <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
-            <div>
-                <h1 class="h3 mb-1">Übersicht</h1>
-                <p class="text-muted mb-0">Lagerorte und Bestände im Überblick</p>
-            </div>
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bookItemModal">
-                <i class="fa-solid fa-plus me-2"></i>Neues Item einbuchen
-            </button>
-        </div>
-
-        <section id="warehouses-section" class="mb-5">
-            <div class="section-card">
-                <div class="section-header">
-                    <h2 class="h5 mb-0">
-                        <i class="fa-solid fa-building text-primary me-2"></i>Lager-Übersicht
-                    </h2>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th scope="col">ID</th>
-                                <th scope="col">Name</th>
-                                <th scope="col">Standort</th>
-                                <th scope="col">Kapazität</th>
-                            </tr>
-                        </thead>
-                        <tbody id="warehouses-table-body">
-                            <tr>
-                                <td colspan="4" class="text-center text-muted py-4">
-                                    <i class="fa-solid fa-spinner fa-spin me-2"></i>Lade Lager …
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
-
-        <section id="items-section">
-            <div class="section-card">
-                <div class="section-header">
-                    <h2 class="h5 mb-0">
-                        <i class="fa-solid fa-boxes-stacked text-primary me-2"></i>Bestand
-                    </h2>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th scope="col">ID</th>
-                                <th scope="col">Name</th>
-                                <th scope="col">Menge</th>
-                                <th scope="col">Typ</th>
-                            </tr>
-                        </thead>
-                        <tbody id="items-table-body">
-                            <tr>
-                                <td colspan="4" class="text-center text-muted py-4">
-                                    <i class="fa-solid fa-spinner fa-spin me-2"></i>Lade Bestand …
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
-
-    </main>
-
-    <div class="modal fade" id="bookItemModal" tabindex="-1" aria-labelledby="bookItemModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="bookItemModalLabel">
-                        <i class="fa-solid fa-arrow-down me-2 text-primary"></i>Neues Item einbuchen
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
-                </div>
-                <form id="book-item-form">
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="item-name" class="form-label">Name</label>
-                            <input type="text" class="form-control" id="item-name" placeholder="z. B. Akkubohrer 18V" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="item-quantity" class="form-label">Menge</label>
-                            <input type="number" class="form-control" id="item-quantity" min="1" placeholder="10" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="item-type" class="form-label">Typ</label>
-                            <select class="form-select" id="item-type" required>
-                                <option value="" selected disabled>Bitte wählen …</option>
-                                <option value="Tool">Werkzeug</option>
-                                <option value="ConsumableMaterial">Verbrauchsmaterial</option>
-                            </select>
-                        </div>
-                        <div class="mb-0">
-                            <label for="item-warehouse" class="form-label">Lager</label>
-                            <select class="form-select" id="item-warehouse" required>
-                                <option value="" selected disabled>Bitte wählen …</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fa-solid fa-check me-1"></i>Einbuchen
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+<main class="container py-4 py-md-5">
+    <div class="mb-4 mb-md-5">
+        <p class="eyebrow mb-2">OPERATIONS HUB</p>
+        <h1 class="display-6 fw-bold mb-2">Lager intelligent steuern.</h1>
+        <p class="text-body-secondary mb-0">Bestände, Kapazitäten und Aufträge zentral im Blick.</p>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="js/app.js"></script>
+    <section class="card dashboard-card border-0 mb-4">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div><p class="section-kicker mb-1">STANDORTE</p><h2 class="h4 mb-0">Lagerstandorte</h2></div>
+            <button class="btn btn-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#warehouseModal"><i class="bi bi-plus-lg me-2"></i>Neues Lager</button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead><tr><th>ID</th><th>Name</th><th>Standort</th><th>Max. Volumen</th><th class="text-end">Aktionen</th></tr></thead>
+                    <tbody id="warehouse-list"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section class="card dashboard-card border-0 mb-4">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex align-items-center gap-2 flex-wrap"><div><p class="section-kicker mb-1">BESTAND</p><h2 id="inventoryTitle" class="h4 mb-0">Inventar</h2></div><button id="resetFilterBtn" class="btn btn-sm btn-outline-secondary d-none">Filter zurücksetzen</button></div>
+            <button class="btn btn-success rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#itemModal"><i class="bi bi-box-arrow-in-down me-2"></i>Neues Item</button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead><tr><th>ID</th><th>Item Name</th><th>Verfügbar / Gesamt</th><th>Lager-Zuweisung</th><th class="text-end">Aktionen</th></tr></thead>
+                    <tbody id="item-list"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section class="card dashboard-card border-0 mb-4">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div><p class="section-kicker mb-1">PLANUNG</p><h2 class="h4 mb-0">Aufträge &amp; Projekte</h2></div>
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#projectModal"><i class="bi bi-clipboard2-plus me-2"></i>Neuer Auftrag</button>
+                <button class="btn btn-outline-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#allocationModal"><i class="bi bi-link-45deg me-2"></i>Ressourcen zuweisen</button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead><tr><th>ID</th><th>Name</th><th>Beschreibung</th><th>Benötigte Ressourcen</th><th>Status</th><th class="text-end">Aktionen</th></tr></thead>
+                    <tbody id="project-list"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</main>
+
+<div class="modal fade" id="warehouseModal" tabindex="-1" aria-labelledby="warehouseModalLabel" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0">
+    <form id="warehouseForm"><div class="modal-header"><h5 class="modal-title" id="warehouseModalLabel">Neues Lager anlegen</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button></div>
+        <div class="modal-body"><div class="mb-3"><label for="warehouseName" class="form-label">Name</label><input id="warehouseName" class="form-control" required></div><div class="mb-3"><label for="warehouseLocation" class="form-label">Standort</label><input id="warehouseLocation" class="form-control" required></div><div><label for="maxSpace" class="form-label">Max. Volumen (m³)</label><input id="maxSpace" name="maxSpace" type="number" min="0.1" step="0.1" class="form-control" required></div></div>
+        <div class="modal-footer"><button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Abbrechen</button><button type="submit" class="btn btn-primary rounded-pill">Speichern</button></div>
+    </form>
+</div></div></div>
+
+<div class="modal fade" id="itemModal" tabindex="-1" aria-labelledby="itemModalLabel" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0">
+    <form id="itemForm"><div class="modal-header"><h5 class="modal-title" id="itemModalLabel">Neues Item einbuchen</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button></div>
+        <div class="modal-body"><div class="mb-3"><label for="itemName" class="form-label">Name</label><input id="itemName" class="form-control" required></div><div class="mb-3"><label for="itemQuantityInStock" class="form-label">Bestand</label><input id="itemQuantityInStock" type="number" min="0" class="form-control" required></div><div class="mb-3"><label for="spacePerUnit" class="form-label">Platzbedarf pro Stück (m³)</label><input id="spacePerUnit" name="spacePerUnit" type="number" min="0" step="0.01" class="form-control" required></div><div><label for="warehouseSelect" class="form-label">Lager</label><select id="warehouseSelect" class="form-select" required></select></div></div>
+        <div class="modal-footer"><button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Abbrechen</button><button type="submit" class="btn btn-success rounded-pill">Einbuchen</button></div>
+    </form>
+</div></div></div>
+
+<div class="modal fade" id="projectModal" tabindex="-1" aria-labelledby="projectModalLabel" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0">
+    <form id="projectForm"><div class="modal-header"><h5 class="modal-title" id="projectModalLabel">Neuen Auftrag anlegen</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button></div>
+        <div class="modal-body"><div class="mb-3"><label for="projectName" class="form-label">Name</label><input id="projectName" class="form-control" required></div><div><label for="projectDescription" class="form-label">Beschreibung</label><textarea id="projectDescription" class="form-control" rows="3" required></textarea></div></div>
+        <div class="modal-footer"><button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Abbrechen</button><button type="submit" class="btn btn-primary rounded-pill">Speichern</button></div>
+    </form>
+</div></div></div>
+
+<div class="modal fade" id="allocationModal" tabindex="-1" aria-labelledby="allocationModalLabel" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0">
+    <form id="allocationForm"><div class="modal-header"><h5 class="modal-title" id="allocationModalLabel">Ressourcen zuweisen</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button></div>
+        <div class="modal-body"><div class="mb-3"><label for="allocationProjectSelect" class="form-label">Auftrag</label><select id="allocationProjectSelect" class="form-select" required></select></div><div class="mb-3"><label for="allocationItemSelect" class="form-label">Item</label><select id="allocationItemSelect" class="form-select" required></select></div><div><label for="allocationQuantity" class="form-label">Menge</label><input id="allocationQuantity" type="number" min="1" class="form-control" required></div></div>
+        <div class="modal-footer"><button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Abbrechen</button><button type="submit" class="btn btn-primary rounded-pill">Zuweisen</button></div>
+    </form>
+</div></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>

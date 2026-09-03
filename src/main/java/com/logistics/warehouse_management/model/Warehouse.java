@@ -1,5 +1,6 @@
 package com.logistics.warehouse_management.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -26,8 +27,9 @@ public class Warehouse {
 
     private String location;
 
-    private Integer maxCapacity;
+    private Double maxSpace;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "warehouse")
     private List<InventoryItem> inventoryItems = new ArrayList<>();
 }

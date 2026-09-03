@@ -26,8 +26,18 @@ public abstract class InventoryItem {
 
     private Integer quantityInStock;
 
+    private Integer reservedQuantity = 0;
+
     private Double weightPerUnit;
+
+    private Double spacePerUnit;
 
     @ManyToOne
     private Warehouse warehouse;
+
+    public int getAvailableQuantity() {
+        int stock = quantityInStock == null ? 0 : quantityInStock;
+        int reserved = reservedQuantity == null ? 0 : reservedQuantity;
+        return stock - reserved;
+    }
 }

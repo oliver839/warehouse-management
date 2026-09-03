@@ -1,5 +1,8 @@
 package com.logistics.warehouse_management.model;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -23,13 +26,14 @@ public class Project {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String projectName;
+    private String name;
 
-    private Double budget;
+    private String description;
 
-    @ManyToOne
-    private ProjectManager projectManager;
+    @Enumerated(EnumType.STRING)
+    private ProjectStatus status = ProjectStatus.PENDING;
 
+    @JsonManagedReference
     @OneToMany(mappedBy = "project")
     private List<ProjectAllocation> allocations = new ArrayList<>();
 }

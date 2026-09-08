@@ -1,5 +1,6 @@
 package com.logistics.warehouse_management.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -22,6 +23,12 @@ public abstract class InventoryItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false, unique = true)
+    private String sku;
+
+    @Column(unique = true)
+    private String barcode;
+
     private String name;
 
     private Integer quantityInStock;
@@ -32,8 +39,17 @@ public abstract class InventoryItem {
 
     private Double spacePerUnit;
 
+    private Double length;
+
+    private Double width;
+
+    private Double height;
+
     @ManyToOne
     private Warehouse warehouse;
+
+    @ManyToOne
+    private BinLocation binLocation;
 
     public int getAvailableQuantity() {
         int stock = quantityInStock == null ? 0 : quantityInStock;

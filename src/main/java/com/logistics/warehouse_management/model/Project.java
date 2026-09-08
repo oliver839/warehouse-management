@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Column;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -26,9 +27,18 @@ public class Project {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(unique = true)
+    private String orderNumber;
+
     private String name;
 
     private String description;
+
+    private String customerName;
+
+    private String customerEmail;
+
+    private String deliveryAddress;
 
     @Enumerated(EnumType.STRING)
     private ProjectStatus status = ProjectStatus.PENDING;

@@ -12,12 +12,19 @@
     <link href="css/styles.css" rel="stylesheet">
 </head>
 <body>
+<div class="modal fade" id="loginModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0">
+    <form id="loginForm"><div class="modal-header"><h5 class="modal-title" id="loginModalLabel">WMS-Anmeldung</h5></div>
+        <div class="modal-body"><div id="loginError" class="alert alert-danger d-none" role="alert">Anmeldung fehlgeschlagen.</div><div class="mb-3"><label for="loginUsername" class="form-label">Benutzername</label><input id="loginUsername" class="form-control" autocomplete="username" required></div><div><label for="loginPassword" class="form-label">Passwort</label><input id="loginPassword" type="password" class="form-control" autocomplete="current-password" required></div></div>
+        <div class="modal-footer"><button type="submit" class="btn btn-primary rounded-pill">Anmelden</button></div>
+    </form>
+</div></div></div>
 <nav class="navbar navbar-expand navbar-glass sticky-top">
     <div class="container">
         <a class="navbar-brand d-flex align-items-center gap-2 fw-bold" href="#">
             <span class="brand-icon"><i class="bi bi-box-seam-fill"></i></span>
             Warehouse Dashboard
         </a>
+        <span id="currentUser" class="text-body-secondary small ms-auto me-3"></span>
         <button id="themeToggle" class="btn btn-icon" type="button" aria-label="Darstellung wechseln" title="Darstellung wechseln">
             <i id="themeToggleIcon" class="bi bi-moon-stars-fill"></i>
         </button>
@@ -72,13 +79,48 @@
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
-                    <thead><tr><th>ID</th><th>Name</th><th>Beschreibung</th><th>Benötigte Ressourcen</th><th>Status</th><th class="text-end">Aktionen</th></tr></thead>
+                    <thead><tr><th>ID</th><th>Auftragsnummer / Name</th><th>Beschreibung</th><th>Benötigte Ressourcen</th><th>Status</th><th class="text-end">Aktionen</th></tr></thead>
                     <tbody id="project-list"></tbody>
                 </table>
             </div>
         </div>
     </section>
 </main>
+
+<section class="container pb-4">
+    <div class="card dashboard-card border-0 mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center"><div><p class="section-kicker mb-1">LAGERPLÄTZE</p><h2 class="h4 mb-0">Bin-Hierarchie</h2></div><button id="refreshBinsBtn" class="btn btn-outline-primary rounded-pill" type="button"><i class="bi bi-arrow-clockwise me-2"></i>Aktualisieren</button></div>
+        <div class="card-body"><div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Code</th><th>Beschreibung</th><th>Kapazität</th><th>Status</th><th>Struktur</th></tr></thead><tbody id="bin-list"></tbody></table></div></div>
+    </div>
+
+    <div class="card dashboard-card border-0 mb-4">
+        <div class="card-header"><p class="section-kicker mb-1">WARENEINGANG</p><h2 class="h4 mb-0">Lieferung einbuchen</h2></div>
+        <div class="card-body"><form id="goodsReceiptForm"><div class="row g-3"><div class="col-md-3"><label for="receiptNumber" class="form-label">Belegnummer</label><input id="receiptNumber" class="form-control" required></div><div class="col-md-3"><label for="supplierName" class="form-label">Lieferant</label><input id="supplierName" class="form-control"></div><div class="col-md-3"><label for="receiptItemSelect" class="form-label">Artikel</label><select id="receiptItemSelect" class="form-select" required></select></div><div class="col-md-3"><label for="receiptBinSelect" class="form-label">Lagerplatz</label><select id="receiptBinSelect" class="form-select" required></select></div><div class="col-md-3"><label for="expectedQuantity" class="form-label">Erwartet</label><input id="expectedQuantity" type="number" min="0" class="form-control" required></div><div class="col-md-3"><label for="receivedQuantity" class="form-label">Geliefert</label><input id="receivedQuantity" type="number" min="0" class="form-control" required></div><div class="col-md-3"><button class="btn btn-success w-100" type="submit"><i class="bi bi-box-arrow-in-down me-2"></i>Beleg bestätigen</button></div></div></form></div>
+    </div>
+
+    <div class="card dashboard-card border-0 mb-4">
+        <div class="card-header"><p class="section-kicker mb-1">AUDIT</p><h2 class="h4 mb-0">Bestandshistorie</h2></div>
+        <div class="card-body"><div class="row g-3 align-items-end"><div class="col-md-5"><label for="auditItemSelect" class="form-label">Artikel</label><select id="auditItemSelect" class="form-select"></select></div><div class="col-md-4"><label for="auditReason" class="form-label">Grund</label><select id="auditReason" class="form-select"><option value="">Alle Gründe</option><option>GOODS_RECEIPT</option><option>PICK</option><option>PACK</option><option>SHIPMENT</option><option>MANUAL_ADJUSTMENT</option><option>RESERVATION</option><option>RELEASE</option></select></div><div class="col-md-3"><button id="loadAuditBtn" class="btn btn-outline-primary w-100" type="button">Historie laden</button></div></div><div class="table-responsive mt-4"><table class="table align-middle mb-0"><thead><tr><th>Zeitpunkt</th><th>Grund</th><th>Delta</th><th>Bestand</th><th>Benutzer</th></tr></thead><tbody id="audit-list"></tbody></table></div></div>
+    </div>
+
+    <div class="card dashboard-card border-0 mb-4">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div><p class="section-kicker mb-1">KOMMISSIONIERUNG</p><h2 class="h4 mb-0">Pickaufträge</h2></div>
+            <button id="refreshPickOrdersBtn" class="btn btn-outline-primary rounded-pill px-3" type="button"><i class="bi bi-arrow-clockwise me-2"></i>Aktualisieren</button>
+        </div>
+        <div class="card-body p-0"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead><tr><th>ID</th><th>Auftrag</th><th>Status</th><th>Positionen</th><th class="text-end">Aktionen</th></tr></thead><tbody id="pick-order-list"></tbody></table></div></div>
+    </div>
+
+    <div id="csvImportCard" class="card dashboard-card border-0 mb-4">
+        <div class="card-header"><p class="section-kicker mb-1">WARENAUSGANG</p><h2 class="h4 mb-0">Packtisch</h2></div>
+        <div class="card-body"><div class="row g-3 align-items-end"><div class="col-md-8"><label for="packPickOrderSelect" class="form-label">Gepickter Auftrag</label><select id="packPickOrderSelect" class="form-select"></select></div><div class="col-md-4"><button id="packOrderBtn" class="btn btn-success w-100" type="button"><i class="bi bi-box-seam me-2"></i>Packen und Bestand abbuchen</button></div></div><div class="table-responsive mt-4"><table class="table align-middle mb-0"><thead><tr><th>Dokument</th><th>Empfänger</th><th>Status</th><th class="text-end">PDF</th></tr></thead><tbody id="delivery-note-list"></tbody></table></div></div>
+    </div>
+
+    <div class="card dashboard-card border-0 mb-4">
+        <div class="card-header"><p class="section-kicker mb-1">DATENIMPORT</p><h2 class="h4 mb-0">CSV-Dateien importieren</h2></div>
+        <div class="card-body"><div class="row g-3"><div class="col-md-4"><label for="itemsCsv" class="form-label">Artikelstamm</label><input id="itemsCsv" type="file" accept=".csv,text/csv" class="form-control"><button class="btn btn-outline-primary mt-2 w-100" data-import-type="items" type="button">Artikel importieren</button></div><div class="col-md-4"><label for="projectsCsv" class="form-label">Aufträge</label><input id="projectsCsv" type="file" accept=".csv,text/csv" class="form-control"><button class="btn btn-outline-primary mt-2 w-100" data-import-type="projects" type="button">Aufträge importieren</button></div><div class="col-md-4"><label for="projectLinesCsv" class="form-label">Auftragspositionen</label><input id="projectLinesCsv" type="file" accept=".csv,text/csv" class="form-control"><button class="btn btn-outline-primary mt-2 w-100" data-import-type="project-lines" type="button">Positionen importieren</button></div></div></div>
+    </div>
+</section>
 
 <div class="modal fade" id="warehouseModal" tabindex="-1" aria-labelledby="warehouseModalLabel" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0">
     <form id="warehouseForm"><div class="modal-header"><h5 class="modal-title" id="warehouseModalLabel">Neues Lager anlegen</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button></div>
@@ -89,15 +131,22 @@
 
 <div class="modal fade" id="itemModal" tabindex="-1" aria-labelledby="itemModalLabel" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0">
     <form id="itemForm"><div class="modal-header"><h5 class="modal-title" id="itemModalLabel">Neues Item einbuchen</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button></div>
-        <div class="modal-body"><div class="mb-3"><label for="itemName" class="form-label">Name</label><input id="itemName" class="form-control" required></div><div class="mb-3"><label for="itemQuantityInStock" class="form-label">Bestand</label><input id="itemQuantityInStock" type="number" min="0" class="form-control" required></div><div class="mb-3"><label for="spacePerUnit" class="form-label">Platzbedarf pro Stück (m³)</label><input id="spacePerUnit" name="spacePerUnit" type="number" min="0" step="0.01" class="form-control" required></div><div><label for="warehouseSelect" class="form-label">Lager</label><select id="warehouseSelect" class="form-select" required></select></div></div>
+        <div class="modal-body"><div class="mb-3"><label for="itemSku" class="form-label">SKU</label><input id="itemSku" class="form-control" required></div><div class="mb-3"><label for="itemBarcode" class="form-label">EAN/UPC-Barcode</label><input id="itemBarcode" class="form-control" inputmode="numeric"></div><div class="mb-3"><label for="itemName" class="form-label">Name</label><input id="itemName" class="form-control" required></div><div class="mb-3"><label for="itemQuantityInStock" class="form-label">Bestand</label><input id="itemQuantityInStock" type="number" min="0" class="form-control" required></div><div class="mb-3"><label for="spacePerUnit" class="form-label">Platzbedarf pro Stück (m³)</label><input id="spacePerUnit" name="spacePerUnit" type="number" min="0" step="0.01" class="form-control" required></div><div class="row g-2 mb-3"><div class="col"><label for="itemLength" class="form-label">Länge</label><input id="itemLength" type="number" min="0" step="0.01" class="form-control"></div><div class="col"><label for="itemWidth" class="form-label">Breite</label><input id="itemWidth" type="number" min="0" step="0.01" class="form-control"></div><div class="col"><label for="itemHeight" class="form-label">Höhe</label><input id="itemHeight" type="number" min="0" step="0.01" class="form-control"></div></div><div><label for="warehouseSelect" class="form-label">Lager</label><select id="warehouseSelect" class="form-select" required></select></div></div>
         <div class="modal-footer"><button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Abbrechen</button><button type="submit" class="btn btn-success rounded-pill">Einbuchen</button></div>
     </form>
 </div></div></div>
 
 <div class="modal fade" id="projectModal" tabindex="-1" aria-labelledby="projectModalLabel" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0">
     <form id="projectForm"><div class="modal-header"><h5 class="modal-title" id="projectModalLabel">Neuen Auftrag anlegen</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button></div>
-        <div class="modal-body"><div class="mb-3"><label for="projectName" class="form-label">Name</label><input id="projectName" class="form-control" required></div><div><label for="projectDescription" class="form-label">Beschreibung</label><textarea id="projectDescription" class="form-control" rows="3" required></textarea></div></div>
+        <div class="modal-body"><div class="mb-3"><label for="projectOrderNumber" class="form-label">Auftragsnummer <span class="text-body-secondary">(optional)</span></label><input id="projectOrderNumber" class="form-control"></div><div class="mb-3"><label for="projectName" class="form-label">Name</label><input id="projectName" class="form-control" required></div><div class="mb-3"><label for="projectCustomerName" class="form-label">Kunde <span class="text-body-secondary">(optional)</span></label><input id="projectCustomerName" class="form-control"></div><div class="mb-3"><label for="projectCustomerEmail" class="form-label">E-Mail <span class="text-body-secondary">(optional)</span></label><input id="projectCustomerEmail" type="email" class="form-control"></div><div class="mb-3"><label for="projectDeliveryAddress" class="form-label">Lieferadresse <span class="text-body-secondary">(optional)</span></label><textarea id="projectDeliveryAddress" class="form-control" rows="2"></textarea></div><div><label for="projectDescription" class="form-label">Beschreibung</label><textarea id="projectDescription" class="form-control" rows="3" required></textarea></div></div>
         <div class="modal-footer"><button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Abbrechen</button><button type="submit" class="btn btn-primary rounded-pill">Speichern</button></div>
+    </form>
+</div></div></div>
+
+<div class="modal fade" id="scanModal" tabindex="-1" aria-labelledby="scanModalLabel" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0">
+    <form id="scanForm"><div class="modal-header"><h5 class="modal-title" id="scanModalLabel">Artikel scannen</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button></div>
+        <div class="modal-body"><p id="scanExpectedItem" class="fw-semibold mb-1"></p><p id="scanExpectedLocation" class="text-body-secondary mb-3"></p><label for="scanBarcode" class="form-label">Barcode</label><input id="scanBarcode" class="form-control form-control-lg" autocomplete="off" inputmode="numeric" autofocus required><div class="row g-2 mt-2"><div class="col"><label for="scanQuantity" class="form-label">Menge</label><input id="scanQuantity" type="number" min="1" value="1" class="form-control" required></div></div></div>
+        <div class="modal-footer"><button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Abbrechen</button><button type="submit" class="btn btn-primary rounded-pill"><i class="bi bi-upc-scan me-2"></i>Scan bestätigen</button></div>
     </form>
 </div></div></div>
 

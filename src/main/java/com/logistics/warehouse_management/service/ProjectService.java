@@ -67,6 +67,14 @@ public class ProjectService {
         return projectRepository.save(project);
     }
 
+    @Transactional
+    public Project markCompletedAfterPacking(Long projectId) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Auftrag nicht gefunden"));
+        project.setStatus(ProjectStatus.COMPLETED);
+        return projectRepository.save(project);
+    }
+
     private boolean isActive(ProjectStatus status) {
         return status == ProjectStatus.APPROVED || status == ProjectStatus.IN_PROGRESS;
     }

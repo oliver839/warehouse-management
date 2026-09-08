@@ -4,4 +4,6 @@ import com.logistics.warehouse_management.model.DeliveryNote;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface DeliveryNoteRepository extends JpaRepository<DeliveryNote, Long> {
+
+	boolean existsByPickOrderId(Long pickOrderId);
 }

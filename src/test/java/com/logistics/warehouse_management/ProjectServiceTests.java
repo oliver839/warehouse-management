@@ -41,6 +41,7 @@ class ProjectServiceTests {
         warehouse = warehouseRepository.save(warehouse);
 
         Tool screws = new Tool();
+        screws.setSku("TEST-SCREWS-001");
         screws.setName("Schrauben");
         screws.setQuantityInStock(100);
         screws.setReservedQuantity(0);

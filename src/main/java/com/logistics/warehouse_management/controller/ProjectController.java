@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/projects")
@@ -51,6 +52,9 @@ public class ProjectController {
     @PostMapping
     public Project createProject(@RequestBody Project project) {
         project.setId(null);
+        if (project.getOrderNumber() == null || project.getOrderNumber().isBlank()) {
+            project.setOrderNumber("ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+        }
         project.setStatus(ProjectStatus.PENDING);
         return projectRepository.save(project);
     }

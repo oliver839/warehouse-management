@@ -39,6 +39,8 @@ public class DataInitializer implements CommandLineRunner {
         secondaryWarehouse = warehouseRepository.save(secondaryWarehouse);
 
         Tool drill = new Tool();
+        drill.setSku("TOOL-DRILL-001");
+        drill.setBarcode("4006381333931");
         drill.setName("Akkubohrer");
         drill.setQuantityInStock(15);
         drill.setSerialNumber("SN-1234");
@@ -46,6 +48,8 @@ public class DataInitializer implements CommandLineRunner {
         drill.setWarehouse(mainWarehouse);
 
         ConsumableMaterial screws = new ConsumableMaterial();
+        screws.setSku("MAT-SCREW-M5");
+        screws.setBarcode("4006381333948");
         screws.setName("Schrauben M5");
         screws.setQuantityInStock(5_000);
         screws.setMaterialType("Stahl");

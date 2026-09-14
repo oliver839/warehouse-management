@@ -29,6 +29,11 @@ public class DeliveryNoteLine {
 
     private Integer quantity;
 
-    @ManyToOne(optional = false)
+    private Integer shortageQuantity;
+
+    @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+    private ShortageReason shortageReason;
+
+    @ManyToOne(optional = true)
     private BinLocation binLocation;
 }

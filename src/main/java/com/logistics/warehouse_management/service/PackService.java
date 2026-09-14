@@ -11,8 +11,11 @@ import com.logistics.warehouse_management.repository.DeliveryNoteRepository;
 import com.logistics.warehouse_management.repository.PickOrderLineRepository;
 import com.logistics.warehouse_management.repository.PickOrderRepository;
 import com.logistics.warehouse_management.shipping.ShipmentRequest;
-import com.logistics.warehouse_management.shipping.ShipmentResponse;
-import com.logistics.warehouse_management.shipping.ShippingProvider;
+import com.logistics.warehouse_management.model.ShippingOutboxEvent;
+import com.logistics.warehouse_management.model.ShippingOutboxStatus;
+import com.logistics.warehouse_management.repository.ShippingOutboxEventRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,20 +33,23 @@ public class PackService {
     private final DeliveryNoteRepository deliveryNoteRepository;
     private final InventoryService inventoryService;
     private final ProjectService projectService;
-    private final ShippingProvider shippingProvider;
+    private final ShippingOutboxEventRepository outboxRepository;
+    private final ObjectMapper objectMapper;
 
     public PackService(PickOrderRepository pickOrderRepository,
                        PickOrderLineRepository lineRepository,
                        DeliveryNoteRepository deliveryNoteRepository,
                        InventoryService inventoryService,
                        ProjectService projectService,
-                       ShippingProvider shippingProvider) {
+                       ShippingOutboxEventRepository outboxRepository,
+                       ObjectMapper objectMapper) {
         this.pickOrderRepository = pickOrderRepository;
         this.lineRepository = lineRepository;
         this.deliveryNoteRepository = deliveryNoteRepository;
         this.inventoryService = inventoryService;
         this.projectService = projectService;
-        this.shippingProvider = shippingProvider;
+        this.outboxRepository = outboxRepository;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional
@@ -57,8 +63,9 @@ public class PackService {
             throw badRequest("Dieser Pickauftrag wurde bereits gepackt.");
         }
         List<PickOrderLine> pickLines = lineRepository.findByPickOrderIdOrderByBinLocationCodeAsc(pickOrderId);
-        if (pickLines.isEmpty() || pickLines.stream().anyMatch(line -> line.getStatus() != PickLineStatus.PICKED)) {
-            throw badRequest("Alle Pickpositionen müssen vollständig gepickt sein.");
+        if (pickLines.isEmpty() || pickLines.stream().anyMatch(line -> line.getStatus() != PickLineStatus.PICKED
+                && line.getStatus() != PickLineStatus.SHORTAGE_REPORTED)) {
+            throw badRequest("Alle Pickpositionen müssen gepickt oder als Fehlmenge gemeldet sein.");
         }
 
         DeliveryNote note = new DeliveryNote();
@@ -71,25 +78,42 @@ public class PackService {
         note = deliveryNoteRepository.save(note);
 
         for (PickOrderLine pickLine : pickLines) {
-            int quantity = pickLine.getRequiredQuantity();
+            int quantity = pickLine.getPickedQuantity() == null ? 0 : pickLine.getPickedQuantity();
+            if (quantity == 0) {
+                continue;
+            }
             DeliveryNoteLine noteLine = new DeliveryNoteLine();
             noteLine.setDeliveryNote(note);
             noteLine.setInventoryItem(pickLine.getInventoryItem());
             noteLine.setQuantity(quantity);
-            noteLine.setBinLocation(pickLine.getBinLocation());
+            noteLine.setShortageQuantity(pickLine.getShortageQuantity());
+            noteLine.setShortageReason(pickLine.getShortageReason());
+            noteLine.setBinLocation(pickLine.getBinLocation()); // null erlaubt: Bulk-Stock (ohne Lagerplatz)
             note.getLines().add(noteLine);
             inventoryService.consumeReservedStock(pickLine.getInventoryItem(), quantity,
                     "DELIVERY_NOTE", note.getId());
         }
         note.setPackStatus(PackStatus.PACKED);
-        ShipmentResponse shipment = shippingProvider.createShipment(new ShipmentRequest(
-            note.getDocumentNumber(), note.getRecipient(), note.getDeliveryAddress(), 1));
-        note.setShippingShipmentId(shipment.shipmentId());
-        note.setTrackingNumber(shipment.trackingNumber());
-        note.setShippingStatus(com.logistics.warehouse_management.model.ShippingStatus.SHIPPED);
         note = deliveryNoteRepository.save(note);
+        ShippingOutboxEvent event = new ShippingOutboxEvent();
+        event.setDeliveryNoteId(note.getId());
+        event.setIdempotencyKey("delivery-note-" + note.getId());
+        event.setPayload(payload(note));
+        event.setStatus(ShippingOutboxStatus.PENDING);
+        event.setCreatedAt(LocalDateTime.now());
+        event.setAttempts(0);
+        outboxRepository.save(event);
         projectService.markCompletedAfterPacking(pickOrder.getProject().getId());
         return note;
+    }
+
+    private String payload(DeliveryNote note) {
+        try {
+            return objectMapper.writeValueAsString(new com.logistics.warehouse_management.shipping.ShippingOutboxPayload(
+                    note.getId(), note.getDocumentNumber(), note.getRecipient(), note.getDeliveryAddress(), 1));
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Versandereignis konnte nicht erstellt werden", exception);
+        }
     }
 
     private ResponseStatusException badRequest(String message) {

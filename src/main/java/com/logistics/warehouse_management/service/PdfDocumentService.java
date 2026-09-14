@@ -44,10 +44,11 @@ public class PdfDocumentService {
             write(stream, "Auftrag: " + safe(order.getProject().getOrderNumber()));
             write(stream, "Status: " + order.getStatus());
             for (PickOrderLine line : pickLineRepository.findByPickOrderIdOrderByBinLocationCodeAsc(pickOrderId)) {
-                write(stream, safe(line.getBinLocation().getCode()) + " | "
+                write(stream, safe(binCode(line.getBinLocation())) + " | "
                         + safe(line.getInventoryItem().getSku()) + " | "
                         + safe(line.getInventoryItem().getName()) + " | Menge: "
-                        + line.getRequiredQuantity());
+                            + line.getRequiredQuantity() + " | Fehlmenge: "
+                            + (line.getShortageQuantity() == null ? 0 : line.getShortageQuantity()));
             }
         });
     }
@@ -63,10 +64,11 @@ public class PdfDocumentService {
             write(stream, "Lieferadresse: " + safe(note.getDeliveryAddress()));
             write(stream, "Erstellt: " + note.getCreatedAt());
             for (DeliveryNoteLine line : note.getLines()) {
-                write(stream, safe(line.getBinLocation().getCode()) + " | "
+                write(stream, safe(binCode(line.getBinLocation())) + " | "
                         + safe(line.getInventoryItem().getSku()) + " | "
                         + safe(line.getInventoryItem().getName()) + " | Menge: "
-                        + line.getQuantity());
+                            + line.getQuantity() + " | Fehlmenge: "
+                            + (line.getShortageQuantity() == null ? 0 : line.getShortageQuantity()));
             }
         });
     }
@@ -96,6 +98,10 @@ public class PdfDocumentService {
 
     private String safe(String value) {
         return value == null ? "-" : value.replace("\n", " ").replace("\r", " ");
+    }
+
+    private String binCode(com.logistics.warehouse_management.model.BinLocation bin) {
+        return bin == null || bin.getCode() == null ? "Bulk" : bin.getCode();
     }
 
     private ResponseStatusException notFound(String message) {

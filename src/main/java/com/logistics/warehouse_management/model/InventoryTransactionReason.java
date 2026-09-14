@@ -6,6 +6,7 @@ public enum InventoryTransactionReason {
     PACK,
     SHIPMENT,
     MANUAL_ADJUSTMENT,
+    STATUS_CHANGE,
     RESERVATION,
     RELEASE
 }

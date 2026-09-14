@@ -9,6 +9,7 @@ import com.logistics.warehouse_management.model.StorageLevel;
 import com.logistics.warehouse_management.repository.AisleRepository;
 import com.logistics.warehouse_management.repository.BinLocationRepository;
 import com.logistics.warehouse_management.repository.InventoryItemRepository;
+import com.logistics.warehouse_management.repository.StockPositionRepository;
 import com.logistics.warehouse_management.repository.RackRepository;
 import com.logistics.warehouse_management.repository.StorageLevelRepository;
 import com.logistics.warehouse_management.repository.WarehouseZoneRepository;
@@ -26,19 +27,22 @@ public class StorageLocationService {
     private final StorageLevelRepository levelRepository;
     private final BinLocationRepository binRepository;
     private final InventoryItemRepository itemRepository;
+    private final StockPositionRepository stockPositionRepository;
 
     public StorageLocationService(WarehouseZoneRepository zoneRepository,
                                   AisleRepository aisleRepository,
                                   RackRepository rackRepository,
                                   StorageLevelRepository levelRepository,
                                   BinLocationRepository binRepository,
-                                  InventoryItemRepository itemRepository) {
+                                  InventoryItemRepository itemRepository,
+                                  StockPositionRepository stockPositionRepository) {
         this.zoneRepository = zoneRepository;
         this.aisleRepository = aisleRepository;
         this.rackRepository = rackRepository;
         this.levelRepository = levelRepository;
         this.binRepository = binRepository;
         this.itemRepository = itemRepository;
+        this.stockPositionRepository = stockPositionRepository;
     }
 
     public WarehouseZone saveZone(WarehouseZone zone) {
@@ -77,8 +81,26 @@ public class StorageLocationService {
         if (item.getWarehouse() != null && !item.getWarehouse().getId().equals(target.getWarehouse().getId())) {
             throw badRequest("Der Lagerplatz gehört zu einem anderen Lager.");
         }
-        ensureCapacity(target, item, item.getQuantityInStock() == null ? 0 : item.getQuantityInStock());
-        item.setBinLocation(target);
+        int totalQuantity = stockPositionRepository.findByInventoryItemId(itemId).stream()
+            .mapToInt(position -> position.getQuantity() == null ? 0 : position.getQuantity()).sum();
+        int totalReserved = stockPositionRepository.findByInventoryItemId(itemId).stream()
+            .mapToInt(position -> position.getReservedQuantity() == null ? 0 : position.getReservedQuantity()).sum();
+        ensureCapacity(target, item, totalQuantity);
+        java.util.List<com.logistics.warehouse_management.model.StockPosition> positions = stockPositionRepository.findByInventoryItemId(itemId);
+        if (positions.isEmpty()) {
+            com.logistics.warehouse_management.model.StockPosition position = new com.logistics.warehouse_management.model.StockPosition();
+            position.setInventoryItem(item);
+            position.setBinLocation(target);
+            position.setQuantity(totalQuantity);
+            position.setReservedQuantity(totalReserved);
+            position.setStatus(com.logistics.warehouse_management.model.StockStatus.AVAILABLE);
+            stockPositionRepository.save(position);
+        } else {
+            com.logistics.warehouse_management.model.StockPosition destination = positions.get(0);
+            destination.setBinLocation(target);
+            stockPositionRepository.save(destination);
+            positions.stream().skip(1).forEach(stockPositionRepository::delete);
+        }
         item.setWarehouse(target.getWarehouse());
         itemRepository.save(item);
     }
@@ -93,20 +115,19 @@ public class StorageLocationService {
     }
 
     public void ensureCapacity(BinLocation bin, InventoryItem item, int addedQuantity) {
-        double used = itemRepository.findByBinLocationId(bin.getId()).stream()
-                .filter(existing -> item == null || !existing.getId().equals(item.getId()))
-                .mapToDouble(this::spaceUsed)
+        double used = stockPositionRepository.findByBinLocationId(bin.getId()).stream()
+            .filter(position -> item == null || !position.getInventoryItem().getId().equals(item.getId()))
+            .mapToDouble(position -> spaceUsed(position.getInventoryItem(), position.getQuantity()))
                 .sum();
         double capacity = bin.getCapacity() == null ? 0.0 : bin.getCapacity();
-        double requested = addedQuantity * (item == null || item.getSpacePerUnit() == null
-                ? 0.0 : item.getSpacePerUnit());
+        double requested = addedQuantity * (item == null || item.getSpacePerUnit() == null ? 0.0 : item.getSpacePerUnit());
         if (used + requested > capacity) {
             throw badRequest("Nicht genügend Kapazität am Lagerplatz verfügbar.");
         }
     }
 
-    private double spaceUsed(InventoryItem item) {
-        int quantity = item.getQuantityInStock() == null ? 0 : item.getQuantityInStock();
+    private double spaceUsed(InventoryItem item, Integer positionQuantity) {
+        int quantity = positionQuantity == null ? 0 : positionQuantity;
         double spacePerUnit = item.getSpacePerUnit() == null ? 0.0 : item.getSpacePerUnit();
         return quantity * spacePerUnit;
     }

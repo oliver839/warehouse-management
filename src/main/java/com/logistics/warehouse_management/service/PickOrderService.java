@@ -10,6 +10,9 @@ import com.logistics.warehouse_management.model.PickScan;
 import com.logistics.warehouse_management.model.Project;
 import com.logistics.warehouse_management.model.ProjectAllocation;
 import com.logistics.warehouse_management.model.ProjectStatus;
+import com.logistics.warehouse_management.model.StockPosition;
+import com.logistics.warehouse_management.model.StockAllocationStrategy;
+import com.logistics.warehouse_management.model.ShortageReason;
 import com.logistics.warehouse_management.repository.PickOrderLineRepository;
 import com.logistics.warehouse_management.repository.PickOrderRepository;
 import com.logistics.warehouse_management.repository.PickScanRepository;
@@ -18,6 +21,8 @@ import com.logistics.warehouse_management.repository.ProjectRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
@@ -34,6 +39,8 @@ public class PickOrderService {
     private final ProjectAllocationRepository allocationRepository;
     private final ProjectService projectService;
     private final PickScanService scanService;
+    private final InventoryService inventoryService;
+    private final StockAllocationService stockAllocationService;
 
     public PickOrderService(PickOrderRepository pickOrderRepository,
                             PickOrderLineRepository lineRepository,
@@ -41,7 +48,9 @@ public class PickOrderService {
                             ProjectRepository projectRepository,
                             ProjectAllocationRepository allocationRepository,
                             ProjectService projectService,
-                            PickScanService scanService) {
+                            PickScanService scanService,
+                            InventoryService inventoryService,
+                            StockAllocationService stockAllocationService) {
         this.pickOrderRepository = pickOrderRepository;
         this.lineRepository = lineRepository;
         this.scanRepository = scanRepository;
@@ -49,6 +58,8 @@ public class PickOrderService {
         this.allocationRepository = allocationRepository;
         this.projectService = projectService;
         this.scanService = scanService;
+        this.inventoryService = inventoryService;
+        this.stockAllocationService = stockAllocationService;
     }
 
     @Transactional
@@ -63,26 +74,47 @@ public class PickOrderService {
             throw badRequest("Der Auftrag enthält keine Positionen.");
         }
 
-        List<ProjectAllocation> allocations = projectAllocations.stream()
-                .sorted(Comparator.comparing(allocation -> binCode(allocation.getInventoryItem().getBinLocation())))
-                .toList();
+        List<ProjectAllocation> allocations = projectAllocations;
         PickOrder pickOrder = new PickOrder();
         pickOrder.setProject(project);
         pickOrder.setStatus(PickOrderStatus.CREATED);
         pickOrder.setCreatedAt(LocalDateTime.now());
         for (ProjectAllocation allocation : allocations) {
-            BinLocation bin = allocation.getInventoryItem().getBinLocation();
-            if (bin == null || !bin.isActive()) {
-                throw badRequest("Jede Auftragsposition benötigt einen aktiven Quell-Lagerplatz.");
+            int remaining = allocation.getAllocatedQuantity();
+                List<StockPosition> positions;
+                try {
+                    positions = stockAllocationService.findReservedPositionsForPicking(
+                        allocation.getInventoryItem(), remaining, StockAllocationStrategy.FEFO);
+                } catch (IllegalStateException exception) {
+                    int reservedTotal = inventoryService.reservedStock(allocation.getInventoryItem());
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "Keine kommissionierfähige Reservierung für "
+                                    + allocation.getInventoryItem().getName()
+                                    + " (reserviert gesamt: " + reservedTotal
+                                    + ", benötigt: " + remaining
+                                    + "). Bitte Bestand einbuchen (Wareneingang) und Auftrag erneut genehmigen.");
+                }
+                positions = positions.stream()
+                    .sorted(Comparator.comparing(position -> binCode(position.getBinLocation())))
+                    .toList();
+            for (StockPosition position : positions) {
+                int quantity = Math.min(remaining, position.getReservedQuantity());
+                PickOrderLine line = new PickOrderLine();
+                line.setPickOrder(pickOrder);
+                line.setInventoryItem(allocation.getInventoryItem());
+                line.setStockPosition(position);
+                line.setBatch(position.getBatch());
+                line.setRequiredQuantity(quantity);
+                line.setPickedQuantity(0);
+                line.setBinLocation(position.getBinLocation());
+                line.setStatus(PickLineStatus.OPEN);
+                pickOrder.getLines().add(line);
+                remaining -= quantity;
+                if (remaining == 0) break;
             }
-            PickOrderLine line = new PickOrderLine();
-            line.setPickOrder(pickOrder);
-            line.setInventoryItem(allocation.getInventoryItem());
-            line.setRequiredQuantity(allocation.getAllocatedQuantity());
-            line.setPickedQuantity(0);
-            line.setBinLocation(bin);
-            line.setStatus(PickLineStatus.OPEN);
-            pickOrder.getLines().add(line);
+            if (remaining > 0) {
+                throw badRequest("Nicht genügend reservierter Bestand auf aktiven Lagerplätzen verfügbar.");
+            }
         }
         return pickOrderRepository.save(pickOrder);
     }
@@ -146,12 +178,60 @@ public class PickOrderService {
             throw badRequest("Nur aktive Pickaufträge können abgeschlossen werden.");
         }
         if (lineRepository.findByPickOrderIdOrderByBinLocationCodeAsc(pickOrderId).stream()
-                .anyMatch(line -> line.getStatus() != PickLineStatus.PICKED)) {
-            throw badRequest("Alle Pickpositionen müssen vollständig gepickt sein.");
+                .anyMatch(line -> line.getStatus() != PickLineStatus.PICKED
+                        && line.getStatus() != PickLineStatus.SHORTAGE_REPORTED)) {
+            throw badRequest("Alle Pickpositionen müssen gepickt oder als Fehlmenge gemeldet sein.");
         }
         pickOrder.setStatus(PickOrderStatus.COMPLETED);
         pickOrder.setCompletedAt(LocalDateTime.now());
         return pickOrderRepository.save(pickOrder);
+    }
+
+    @Transactional
+    public PickOrder reportShortage(Long pickOrderId, Long lineId, com.logistics.warehouse_management.controller.ShortageRequest request) {
+        PickOrder pickOrder = requireOrder(pickOrderId);
+        PickOrderLine line = lineRepository.findById(lineId)
+                .orElseThrow(() -> notFound("Pickposition nicht gefunden"));
+        if (!line.getPickOrder().getId().equals(pickOrderId)) {
+            throw badRequest("Die Pickposition gehört nicht zu diesem Pickauftrag.");
+        }
+        if (pickOrder.getStatus() != PickOrderStatus.IN_PROGRESS) {
+            throw badRequest("Der Pickauftrag ist nicht aktiv.");
+        }
+        if (line.getStatus() == PickLineStatus.PICKED || line.getStatus() == PickLineStatus.SHORTAGE_REPORTED) {
+            throw badRequest("Für diese Pickposition wurde bereits ein Ergebnis erfasst.");
+        }
+        if (request == null || request.physicallyFoundQuantity() == null || request.reason() == null) {
+            throw badRequest("Gefundene Menge und Fehlmengen-Grund sind erforderlich.");
+        }
+        int found = request.physicallyFoundQuantity();
+        int picked = line.getPickedQuantity() == null ? 0 : line.getPickedQuantity();
+        int required = line.getRequiredQuantity() == null ? 0 : line.getRequiredQuantity();
+        if (found < 0 || found > required || found < picked) {
+            throw badRequest("Die gefundene Menge muss zwischen der bereits gepickten und der Sollmenge liegen.");
+        }
+        int shortage = required - found;
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        line.setPickedQuantity(found);
+        line.setShortageQuantity(shortage);
+        line.setShortageReason(request.reason());
+        line.setShortageNote(request.note());
+        line.setShortageReportedAt(LocalDateTime.now());
+        line.setShortageReportedBy(authentication == null ? "system" : authentication.getName());
+        line.setStatus(shortage == 0 ? PickLineStatus.PICKED : PickLineStatus.SHORTAGE_REPORTED);
+        lineRepository.save(line);
+        if (line.getBinLocation() != null && (shortage > 0 || found > 0)) {
+            inventoryService.reconcileShortage(line.getInventoryItem(), line.getBinLocation(), found,
+                    shortage, "PICK_LINE", line.getId());
+        }
+        return pickOrderRepository.findById(pickOrderId).orElseThrow();
+    }
+
+    public List<PickOrderLine> getShortages(Long pickOrderId) {
+        requireOrder(pickOrderId);
+        return lineRepository.findByPickOrderIdOrderByBinLocationCodeAsc(pickOrderId).stream()
+                .filter(line -> line.getStatus() == PickLineStatus.SHORTAGE_REPORTED)
+                .toList();
     }
 
     public List<PickOrderLine> getLines(Long pickOrderId) {

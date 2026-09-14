@@ -1,6 +1,8 @@
 let selectedWarehouseId = null;
 let activePickOrderId = null;
 let activePickLineId = null;
+let activeShortageOrderId = null;
+let activeShortageLineId = null;
 let authHeader = sessionStorage.getItem('wms-auth-header');
 const nativeFetch = window.fetch.bind(window);
 window.fetch = (input, init = {}) => {
@@ -32,8 +34,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('goodsReceiptForm').addEventListener('submit', createGoodsReceipt);
     document.getElementById('loadAuditBtn').addEventListener('click', fetchAudit);
     document.getElementById('scanForm').addEventListener('submit', submitScan);
+    document.getElementById('shortageForm').addEventListener('submit', submitShortage);
     document.getElementById('scanModal').addEventListener('shown.bs.modal', () => document.getElementById('scanBarcode').focus());
     document.getElementById('packOrderBtn').addEventListener('click', packSelectedOrder);
+    const allocationModal = document.getElementById('allocationModal');
+    if (allocationModal) {
+        // Dropdown beim Oeffnen frisch laden: sonst sieht man nach „Neuer Auftrag"
+        // noch den alten Stand (Liste wurde nur bei Seitenstart/Login befuellt).
+        allocationModal.addEventListener('show.bs.modal', () => { fetchProjects(); fetchItems(); });
+    }
     document.querySelectorAll('[data-import-type]').forEach(button => button.addEventListener('click', () => uploadCsv(button.dataset.importType)));
     if (!authHeader) showLogin();
     else loadCurrentUser();
@@ -158,16 +167,22 @@ function fetchItemsByWarehouse(warehouseId) {
 
 function renderItems(items) {
     const list = document.getElementById('item-list');
-    if (!items.length) return showEmptyMessage(list, 5);
-    list.innerHTML = items.map(item => {
-        const available = item.availableQuantity ?? item.quantityInStock;
-        const lowStock = item.quantityInStock > 0 && available / item.quantityInStock < 0.2;
-        return `<tr>
-            <td>${item.id}</td><td><strong>${escapeHtml(item.sku)}</strong><br>${escapeHtml(item.name)}${item.barcode ? `<br><small class="text-body-secondary">${escapeHtml(item.barcode)}</small>` : ''}</td>
-            <td class="${lowStock ? 'text-danger fw-bold' : ''}">${available} / ${item.quantityInStock}</td>
-            <td>${escapeHtml(item.warehouse?.name || 'Nicht zugewiesen')}</td>
-            <td><button class="btn btn-danger btn-sm delete-item" data-id="${item.id}">Löschen</button></td>
-        </tr>`;
+    if (!items.length) return showEmptyMessage(list, 6);
+    list.innerHTML = items.flatMap(item => {
+        const positions = item.stockPositions?.length ? item.stockPositions : [null];
+        return positions.map(position => {
+            const quantity = position?.quantity ?? 0;
+            const reserved = position?.reservedQuantity ?? 0;
+            const available = quantity - reserved;
+            const lowStock = quantity > 0 && available / quantity < 0.2;
+            return `<tr>
+                <td>${item.id}</td><td><strong>${escapeHtml(item.sku)}</strong><br>${escapeHtml(item.name)}${item.barcode ? `<br><small class="text-body-secondary">${escapeHtml(item.barcode)}</small>` : ''}</td>
+                <td>${escapeHtml(position?.binLocation?.code || 'Nicht zugewiesen')}</td>
+                <td class="${lowStock ? 'text-danger fw-bold' : ''}">${available} / ${quantity}</td>
+                <td>${escapeHtml(item.warehouse?.name || 'Nicht zugewiesen')}</td>
+                <td><button class="btn btn-danger btn-sm delete-item" data-id="${item.id}">Löschen</button></td>
+            </tr>`;
+        });
     }).join('');
     list.querySelectorAll('.delete-item').forEach(button => button.addEventListener('click', () => deleteItem(button.dataset.id)));
 }
@@ -261,13 +276,38 @@ function populateWarehouseSelect(warehouses) {
 
 function populateAllocationItemSelect(items) {
     const select = document.getElementById('allocationItemSelect');
-    select.innerHTML = items.length ? items.map(item => `<option value="${item.id}">${escapeHtml(item.name)} (${item.availableQuantity ?? item.quantityInStock} verfügbar)</option>`).join('') : '<option value="" disabled selected>Keine Items verfügbar</option>';
+    if (!select) return;
+    const list = Array.isArray(items) ? items : [];
+    if (!list.length) {
+        select.innerHTML = '<option value="" disabled selected>Keine Items verfügbar</option>';
+        return;
+    }
+    select.innerHTML = list.map(item => {
+        const positions = item.stockPositions?.length ? item.stockPositions : [];
+        const available = positions.length
+            ? positions.reduce((sum, p) => sum + Math.max(0, (p.quantity ?? 0) - (p.reservedQuantity ?? 0)), 0)
+            : (item.availableQuantity ?? item.quantityInStock ?? 0);
+        return `<option value="${item.id}">${escapeHtml(item.name)} (${available} verfügbar)</option>`;
+    }).join('');
 }
 
 function populateAllocationProjectSelect(projects) {
     const select = document.getElementById('allocationProjectSelect');
-    const pendingProjects = projects.filter(project => project.status === 'PENDING');
-    select.innerHTML = pendingProjects.length ? pendingProjects.map(project => `<option value="${project.id}">${escapeHtml(project.name)}</option>`).join('') : '<option value="" disabled selected>Keine ausstehenden Aufträge</option>';
+    if (!select) return;
+    const list = Array.isArray(projects) ? projects : [];
+    // Backend erlaubt Zuweisungen nur bei PENDING (ProjectController.addAllocation).
+    const pendingProjects = list.filter(project => project && project.status === 'PENDING');
+    if (!pendingProjects.length) {
+        const total = list.length;
+        const hint = total > 0 ? `Keine ausstehenden Aufträge (${total} vorhanden, Status beachten)` : 'Keine ausstehenden Aufträge';
+        select.innerHTML = `<option value="" disabled selected>${escapeHtml(hint)}</option>`;
+        return;
+    }
+    const previous = select.value;
+    select.innerHTML = pendingProjects.map(project => `<option value="${project.id}">${escapeHtml(project.orderNumber || ('#' + project.id))} — ${escapeHtml(project.name || '')}</option>`).join('');
+    if (previous && pendingProjects.some(project => String(project.id) === String(previous))) {
+        select.value = previous;
+    }
 }
 
 function fetchPickOrders() {
@@ -286,6 +326,7 @@ function fetchPickOrders() {
         list.querySelectorAll('[data-pick-start]').forEach(button => button.addEventListener('click', () => startPickOrder(button.dataset.pickStart)));
         list.querySelectorAll('[data-pick-complete]').forEach(button => button.addEventListener('click', () => completePickOrder(button.dataset.pickComplete)));
         list.querySelectorAll('[data-pick-line]').forEach(button => button.addEventListener('click', () => openScanDialog(button.dataset.pickOrder, button.dataset.pickLine, button.dataset.pickItem, button.dataset.pickLocation)));
+        list.querySelectorAll('[data-shortage-line]').forEach(button => button.addEventListener('click', () => openShortageDialog(button.dataset.shortageOrder, button.dataset.shortageLine, button.dataset.shortageRequired, button.dataset.shortagePicked)));
     }).catch(() => showEmptyMessage(list, 5));
 }
 
@@ -298,9 +339,19 @@ function populatePackOrderSelect(orders) {
 function fetchDeliveryNotes() {
     const list = document.getElementById('delivery-note-list');
     return fetch('/api/delivery-notes').then(ensureSuccessfulResponse).then(notes => {
-        if (!notes.length) return showEmptyMessage(list, 4);
-        list.innerHTML = notes.map(note => `<tr><td>${escapeHtml(note.documentNumber)}</td><td>${escapeHtml(note.recipient || '-')}</td><td>${statusBadge(note.packStatus)}</td><td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="/api/delivery-notes/${note.id}/pdf" title="Lieferschein herunterladen"><i class="bi bi-file-earmark-pdf"></i><span class="visually-hidden">PDF</span></a></td></tr>`).join('');
-    }).catch(() => showEmptyMessage(list, 4));
+        if (!notes.length) return showEmptyMessage(list, 6);
+        list.innerHTML = notes.map(note => {
+            const shipped = note.shippingStatus === 'SHIPPED';
+            const badge = shipped
+                ? '<span class="badge text-bg-success">Versendet</span>'
+                : '<span class="badge text-bg-warning">Versand offen</span>';
+            const tracking = escapeHtml(note.trackingNumber || '-');
+            const labelBtn = shipped
+                ? `<a class="btn btn-sm btn-outline-primary" href="/api/delivery-notes/${note.id}/label" title="Versandlabel herunterladen"><i class="bi bi-upc-scan"></i><span class="visually-hidden">Label</span></a>`
+                : '';
+            return `<tr><td>${escapeHtml(note.documentNumber)}</td><td>${escapeHtml(note.recipient || '-')}</td><td>${statusBadge(note.packStatus)}</td><td>${badge}</td><td>${tracking}</td><td class="text-end"><a class="btn btn-sm btn-outline-secondary me-1" href="/api/delivery-notes/${note.id}/pdf" title="Lieferschein herunterladen"><i class="bi bi-file-earmark-pdf"></i><span class="visually-hidden">PDF</span></a>${labelBtn}</td></tr>`;
+        }).join('');
+    }).catch(() => showEmptyMessage(list, 6));
 }
 
 function packSelectedOrder() {
@@ -308,8 +359,24 @@ function packSelectedOrder() {
     if (!pickOrderId) return alert('Es ist kein gepickter Auftrag ausgewählt.');
     fetch(`/api/delivery-notes/from-pick-order/${pickOrderId}/pack`, { method: 'POST' })
         .then(ensureSuccessfulResponse)
-        .then(() => Promise.all([fetchPickOrders(), fetchDeliveryNotes(), fetchItems()]))
+        .then(note => {
+            // Demo flow: trigger the outbox once, then poll for the shipment.
+            fetch('/api/shipping-outbox/process-due', { method: 'POST' }).catch(() => {});
+            pollShipmentStatus(note.id, 3);
+            return Promise.all([fetchPickOrders(), fetchDeliveryNotes(), fetchItems()]);
+        })
         .catch(error => alert(error.message || 'Der Auftrag konnte nicht gepackt werden.'));
+}
+
+function pollShipmentStatus(deliveryNoteId, remaining) {
+    if (remaining <= 0) return;
+    setTimeout(() => {
+        fetch(`/api/shipping-outbox/by-delivery-note/${deliveryNoteId}`)
+            .then(ensureSuccessfulResponse)
+            .then(() => fetchDeliveryNotes())
+            .catch(() => {})
+            .finally(() => pollShipmentStatus(deliveryNoteId, remaining - 1));
+    }, 2000);
 }
 
 function uploadCsv(type) {
@@ -329,9 +396,12 @@ function uploadCsv(type) {
 
 function renderPickLines(order) {
     return (order.lines || []).map(line => {
-        const scanButton = order.status === 'IN_PROGRESS' && line.status !== 'PICKED'
+        const scanButton = order.status === 'IN_PROGRESS' && line.status !== 'PICKED' && line.status !== 'SHORTAGE_REPORTED'
             ? `<button class="btn btn-sm btn-outline-primary rounded-pill ms-2" data-pick-order="${order.id}" data-pick-line="${line.id}" data-pick-item="${escapeHtml(line.inventoryItem?.name || 'Artikel')}" data-pick-location="${escapeHtml(line.binLocation?.code || 'Kein Bin')}"><i class="bi bi-upc-scan"></i><span class="visually-hidden">Position scannen</span></button>` : '';
-        return `<div class="mb-1"><span>${escapeHtml(line.binLocation?.code || 'Kein Bin')} · ${escapeHtml(line.inventoryItem?.name || 'Artikel')} · ${line.pickedQuantity}/${line.requiredQuantity}</span>${statusBadge(line.status)}${scanButton}</div>`;
+        const shortageButton = order.status === 'IN_PROGRESS' && line.status !== 'PICKED' && line.status !== 'SHORTAGE_REPORTED'
+            ? `<button class="btn btn-sm btn-outline-warning rounded-pill ms-1" data-shortage-order="${order.id}" data-shortage-line="${line.id}" data-shortage-required="${line.requiredQuantity}" data-shortage-picked="${line.pickedQuantity || 0}"><i class="bi bi-exclamation-triangle"></i><span class="visually-hidden">Fehlmenge melden</span></button>` : '';
+        const shortage = line.shortageQuantity ? ` · Fehlmenge: ${line.shortageQuantity}` : '';
+        return `<div class="mb-1 ${line.status === 'SHORTAGE_REPORTED' ? 'text-warning fw-semibold' : ''}"><span>${escapeHtml(line.binLocation?.code || 'Kein Bin')} · ${escapeHtml(line.inventoryItem?.name || 'Artikel')} · ${line.pickedQuantity || 0}/${line.requiredQuantity}${shortage}</span>${statusBadge(line.status)}${scanButton}${shortageButton}</div>`;
     }).join('');
 }
 
@@ -384,6 +454,31 @@ function submitScan(event) {
             document.getElementById('scanBarcode').select();
             alert(error.message || 'Der Scan wurde abgelehnt.');
         });
+}
+
+function openShortageDialog(orderId, lineId, required, picked) {
+    activeShortageOrderId = orderId;
+    activeShortageLineId = lineId;
+    document.getElementById('shortageExpected').textContent = `Sollmenge: ${required} · Bereits gepickt: ${picked}`;
+    document.getElementById('shortageFoundQuantity').value = picked;
+    document.getElementById('shortageNote').value = '';
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('shortageModal')).show();
+}
+
+function submitShortage(event) {
+    event.preventDefault();
+    const payload = {
+        physicallyFoundQuantity: Number(document.getElementById('shortageFoundQuantity').value),
+        reason: document.getElementById('shortageReason').value,
+        note: document.getElementById('shortageNote').value.trim() || null
+    };
+    sendJson(`/api/pick-orders/${activeShortageOrderId}/lines/${activeShortageLineId}/shortage`, 'POST', payload)
+        .then(() => {
+            bootstrap.Modal.getInstance(document.getElementById('shortageModal')).hide();
+            alert('Fehlmenge wurde gespeichert.');
+            return fetchPickOrders();
+        })
+        .catch(error => alert(error.message || 'Die Fehlmenge konnte nicht gespeichert werden.'));
 }
 
 function createWarehouse(event) {

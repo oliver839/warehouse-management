@@ -5,6 +5,7 @@ import com.logistics.warehouse_management.model.Aisle;
 import com.logistics.warehouse_management.model.BinLocation;
 import com.logistics.warehouse_management.model.PickLineStatus;
 import com.logistics.warehouse_management.model.PickOrder;
+import com.logistics.warehouse_management.model.PickOrderLine;
 import com.logistics.warehouse_management.model.Project;
 import com.logistics.warehouse_management.model.ProjectAllocation;
 import com.logistics.warehouse_management.model.ProjectStatus;
@@ -28,6 +29,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 class PickOrderServiceTests {
@@ -62,10 +64,9 @@ class PickOrderServiceTests {
         item.setSku("PICK-TEST-001");
         item.setBarcode("4900000000099");
         item.setName("Pickartikel");
-        item.setQuantityInStock(10);
         item.setSpacePerUnit(0.1);
         item.setWarehouse(warehouse);
-        item.setBinLocation(bin);
+        item.getStockPositions().add(new com.logistics.warehouse_management.model.StockPosition(null, item, null, null, null, bin, 10, 0, com.logistics.warehouse_management.model.StockStatus.AVAILABLE, null));
         item = itemRepository.save(item);
 
         Project project = new Project();
@@ -97,5 +98,46 @@ class PickOrderServiceTests {
                 new PickScanRequest("4900000000099", 1));
         PickOrder completed = pickOrderService.complete(pickOrder.getId());
         assertEquals("COMPLETED", completed.getStatus().name());
+    }
+
+    @Test
+    void createsPickOrderFromBulkStockWithoutBin() {
+        // Regression: StockPosition.binLocation is nullable (bulk stock). Previously
+        // PickOrderLine.binLocation was NOT NULL, so creating a pick order from a
+        // project approved against bulk stock threw DataIntegrityViolationException (500).
+        Warehouse warehouse = warehouseRepository.save(new Warehouse(null, "Bulk-Lager", "Testort", 100.0, null));
+
+        Tool item = new Tool();
+        item.setSku("BULK-001");
+        item.setBarcode("4900000000098");
+        item.setName("Bulk-Artikel");
+        item.setSpacePerUnit(0.1);
+        item.setWarehouse(warehouse);
+        // Bulk stock: StockPosition with NO binLocation (null).
+        item.getStockPositions().add(new com.logistics.warehouse_management.model.StockPosition(
+                null, item, null, null, null, null, 10, 0,
+                com.logistics.warehouse_management.model.StockStatus.AVAILABLE, null));
+        item = itemRepository.save(item);
+
+        Project project = new Project();
+        project.setName("Bulk-Auftrag");
+        project.setStatus(ProjectStatus.PENDING);
+        project = projectRepository.save(project);
+
+        ProjectAllocation allocation = new ProjectAllocation();
+        allocation.setProject(project);
+        allocation.setInventoryItem(item);
+        allocation.setAllocatedQuantity(3);
+        allocationRepository.save(allocation);
+
+        projectService.changeStatus(project.getId(), ProjectStatus.APPROVED);
+
+        PickOrder pickOrder = pickOrderService.create(project.getId());
+
+        PickOrderLine line = pickOrderService.getLines(pickOrder.getId()).get(0);
+        assertEquals(3, line.getRequiredQuantity());
+        assertEquals(3, line.getStockPosition().getReservedQuantity());
+        assertEquals(null, line.getBinLocation(),
+                "Bulk stock (no bin) should map to a null bin on the pick line");
     }
 }

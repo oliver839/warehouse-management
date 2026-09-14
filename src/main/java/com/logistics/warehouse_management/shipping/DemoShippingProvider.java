@@ -10,10 +10,37 @@ import java.util.UUID;
 @ConditionalOnProperty(name = "shipping.provider", havingValue = "demo", matchIfMissing = true)
 public class DemoShippingProvider implements ShippingProvider {
 
+    private final java.util.concurrent.ConcurrentMap<String, ShipmentResponse> byIdempotencyKey =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+
     @Override
     public ShipmentResponse createShipment(ShipmentRequest request) {
+        return createShipment(request, null);
+    }
+
+    @Override
+    public ShipmentResponse createShipment(ShipmentRequest request, String idempotencyKey) {
+        // Simulates a real carrier that deduplicates on Idempotency-Key:
+        // the same key always returns the same shipment, never a second one.
+        if (idempotencyKey != null) {
+            return byIdempotencyKey.computeIfAbsent(idempotencyKey, key -> {
+                calls.incrementAndGet();
+                String id = "demo-" + UUID.randomUUID().toString().substring(0, 8);
+                return new ShipmentResponse(id, "DEMO-" + id.substring(5).toUpperCase(), "CREATED");
+            });
+        }
+        calls.incrementAndGet();
         String id = "demo-" + UUID.randomUUID().toString().substring(0, 8);
         return new ShipmentResponse(id, "DEMO-" + id.substring(5).toUpperCase(), "CREATED");
+    }
+
+    int providerCalls() {
+        return calls.get();
+    }
+
+    public int getProviderCalls() {
+        return calls.get();
     }
 
     @Override

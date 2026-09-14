@@ -13,9 +13,12 @@ import com.logistics.warehouse_management.model.StorageLevel;
 import com.logistics.warehouse_management.model.Tool;
 import com.logistics.warehouse_management.model.Warehouse;
 import com.logistics.warehouse_management.model.WarehouseZone;
+import com.logistics.warehouse_management.model.StockPosition;
+import com.logistics.warehouse_management.model.StockStatus;
 import com.logistics.warehouse_management.repository.InventoryItemRepository;
 import com.logistics.warehouse_management.repository.ProjectAllocationRepository;
 import com.logistics.warehouse_management.repository.ProjectRepository;
+import com.logistics.warehouse_management.repository.ShippingOutboxEventRepository;
 import com.logistics.warehouse_management.repository.WarehouseRepository;
 import com.logistics.warehouse_management.service.PackService;
 import com.logistics.warehouse_management.service.PickOrderService;
@@ -48,6 +51,8 @@ class PackServiceTests {
     private PickOrderService pickOrderService;
     @Autowired
     private PackService packService;
+    @Autowired
+    private ShippingOutboxEventRepository outboxRepository;
 
     @Test
     void packsOnceAndDeductsStockExactlyOnce() {
@@ -62,10 +67,9 @@ class PackServiceTests {
         item.setSku("PACK-TEST-001");
         item.setBarcode("4900000000088");
         item.setName("Packartikel");
-        item.setQuantityInStock(5);
         item.setSpacePerUnit(0.1);
         item.setWarehouse(warehouse);
-        item.setBinLocation(bin);
+        item.getStockPositions().add(new StockPosition(null, item, null, null, null, bin, 5, 0, StockStatus.AVAILABLE, null));
         item = itemRepository.save(item);
 
         Project project = new Project();
@@ -90,8 +94,10 @@ class PackServiceTests {
 
         DeliveryNote note = packService.pack(pickOrder.getId());
         assertEquals(PackStatus.PACKED, note.getPackStatus());
-        assertEquals(3, itemRepository.findById(item.getId()).orElseThrow().getQuantityInStock());
+        assertEquals(1, outboxRepository.findAll().stream()
+            .filter(event -> event.getDeliveryNoteId().equals(note.getId())).count());
+        assertEquals(3, itemRepository.findById(item.getId()).orElseThrow().getStockPositions().get(0).getQuantity());
         assertThrows(ResponseStatusException.class, () -> packService.pack(pickOrder.getId()));
-        assertEquals(3, itemRepository.findById(item.getId()).orElseThrow().getQuantityInStock());
+        assertEquals(3, itemRepository.findById(item.getId()).orElseThrow().getStockPositions().get(0).getQuantity());
     }
 }

@@ -8,6 +8,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Inheritance;
 import jakarta.persistence.InheritanceType;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -23,6 +26,9 @@ public abstract class InventoryItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    private Long version;
+
     @Column(nullable = false, unique = true)
     private String sku;
 
@@ -30,10 +36,6 @@ public abstract class InventoryItem {
     private String barcode;
 
     private String name;
-
-    private Integer quantityInStock;
-
-    private Integer reservedQuantity = 0;
 
     private Double weightPerUnit;
 
@@ -48,12 +50,7 @@ public abstract class InventoryItem {
     @ManyToOne
     private Warehouse warehouse;
 
-    @ManyToOne
-    private BinLocation binLocation;
+    @OneToMany(mappedBy = "inventoryItem", cascade = jakarta.persistence.CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    private java.util.List<StockPosition> stockPositions = new java.util.ArrayList<>();
 
-    public int getAvailableQuantity() {
-        int stock = quantityInStock == null ? 0 : quantityInStock;
-        int reserved = reservedQuantity == null ? 0 : reservedQuantity;
-        return stock - reserved;
-    }
 }

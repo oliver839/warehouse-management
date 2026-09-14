@@ -3,6 +3,8 @@ package com.logistics.warehouse_management.config;
 import com.logistics.warehouse_management.model.ConsumableMaterial;
 import com.logistics.warehouse_management.model.Tool;
 import com.logistics.warehouse_management.model.Warehouse;
+import com.logistics.warehouse_management.model.StockPosition;
+import com.logistics.warehouse_management.model.StockStatus;
 import com.logistics.warehouse_management.repository.InventoryItemRepository;
 import com.logistics.warehouse_management.repository.WarehouseRepository;
 import org.springframework.boot.CommandLineRunner;
@@ -42,7 +44,6 @@ public class DataInitializer implements CommandLineRunner {
         drill.setSku("TOOL-DRILL-001");
         drill.setBarcode("4006381333931");
         drill.setName("Akkubohrer");
-        drill.setQuantityInStock(15);
         drill.setSerialNumber("SN-1234");
         drill.setSpacePerUnit(0.5);
         drill.setWarehouse(mainWarehouse);
@@ -51,13 +52,23 @@ public class DataInitializer implements CommandLineRunner {
         screws.setSku("MAT-SCREW-M5");
         screws.setBarcode("4006381333948");
         screws.setName("Schrauben M5");
-        screws.setQuantityInStock(5_000);
         screws.setMaterialType("Stahl");
         screws.setUnit("Stück");
         screws.setSpacePerUnit(0.001);
         screws.setWarehouse(secondaryWarehouse);
 
+        addDemoStock(drill, 15);
+        addDemoStock(screws, 5_000);
         inventoryItemRepository.save(drill);
         inventoryItemRepository.save(screws);
+    }
+
+    private void addDemoStock(com.logistics.warehouse_management.model.InventoryItem item, int quantity) {
+        StockPosition position = new StockPosition();
+        position.setInventoryItem(item);
+        position.setQuantity(quantity);
+        position.setReservedQuantity(0);
+        position.setStatus(StockStatus.AVAILABLE);
+        item.getStockPositions().add(position);
     }
 }

@@ -61,6 +61,18 @@ public class PickOrderController {
         return service.getScans(id, lineId);
     }
 
+    @PostMapping("/{id}/lines/{lineId}/shortage")
+    public PickOrder reportShortage(@PathVariable Long id,
+                                    @PathVariable Long lineId,
+                                    @RequestBody ShortageRequest request) {
+        return service.reportShortage(id, lineId, request);
+    }
+
+    @GetMapping("/{id}/shortages")
+    public List<PickOrderLine> getShortages(@PathVariable Long id) {
+        return service.getShortages(id);
+    }
+
     @PostMapping("/{id}/complete")
     public PickOrder complete(@PathVariable Long id) {
         return service.complete(id);

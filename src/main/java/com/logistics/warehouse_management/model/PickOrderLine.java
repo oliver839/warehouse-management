@@ -8,6 +8,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -29,13 +30,36 @@ public class PickOrderLine {
     @ManyToOne(optional = false)
     private InventoryItem inventoryItem;
 
+    @ManyToOne
+    private StockPosition stockPosition;
+
+    @ManyToOne
+    private Batch batch;
+
+    @ManyToOne
+    private UnitOfMeasure pickUnit;
+
     private Integer requiredQuantity;
 
     private Integer pickedQuantity = 0;
 
-    @ManyToOne(optional = false)
+    private Integer shortageQuantity = 0;
+
+    @Enumerated(EnumType.STRING)
+    private ShortageReason shortageReason;
+
+    private java.time.LocalDateTime shortageReportedAt;
+
+    private String shortageReportedBy;
+
+    private String shortageNote;
+
+    @ManyToOne(optional = true)
     private BinLocation binLocation;
 
     @Enumerated(EnumType.STRING)
     private PickLineStatus status = PickLineStatus.OPEN;
+
+    @Version
+    private Long version;
 }

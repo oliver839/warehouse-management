@@ -38,9 +38,14 @@ public class HttpShippingProvider implements ShippingProvider {
 
     @Override
     public ShipmentResponse createShipment(ShipmentRequest request) {
+        return createShipment(request, null);
+    }
+
+    @Override
+    public ShipmentResponse createShipment(ShipmentRequest request, String idempotencyKey) {
         try {
             String json = objectMapper.writeValueAsString(request);
-            HttpResponse<String> response = send("/shipments", "POST", json, "application/json");
+            HttpResponse<String> response = send("/shipments", "POST", json, "application/json", idempotencyKey);
             if (response.statusCode() / 100 != 2) {
                 throw new IllegalStateException("Versanddienstleister antwortete mit HTTP " + response.statusCode());
             }
@@ -66,7 +71,7 @@ public class HttpShippingProvider implements ShippingProvider {
     @Override
     public ShippingStatusResponse getStatus(String shipmentId) {
         try {
-            HttpResponse<String> response = send("/shipments/" + shipmentId, "GET", null, null);
+            HttpResponse<String> response = send("/shipments/" + shipmentId, "GET", null, null, null);
             if (response.statusCode() / 100 != 2) throw new IllegalStateException("Versandstatus konnte nicht geladen werden");
             return objectMapper.readValue(response.body(), ShippingStatusResponse.class);
         } catch (IOException | InterruptedException exception) {
@@ -75,10 +80,11 @@ public class HttpShippingProvider implements ShippingProvider {
         }
     }
 
-    private HttpResponse<String> send(String path, String method, String body, String contentType) throws IOException, InterruptedException {
+    private HttpResponse<String> send(String path, String method, String body, String contentType, String idempotencyKey) throws IOException, InterruptedException {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(apiUrl + path))
                 .header("Authorization", "Basic " + Base64.getEncoder().encodeToString((apiKey + ":" + apiSecret).getBytes(StandardCharsets.UTF_8)))
                 .header("X-Tenant", tenant);
+            if (idempotencyKey != null) builder.header("Idempotency-Key", idempotencyKey);
         if ("POST".equals(method)) builder.header("Content-Type", contentType).POST(HttpRequest.BodyPublishers.ofString(body));
         else builder.GET();
         return httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());

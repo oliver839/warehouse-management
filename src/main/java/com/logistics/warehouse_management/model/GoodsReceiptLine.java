@@ -27,6 +27,14 @@ public class GoodsReceiptLine {
     @ManyToOne(optional = false)
     private InventoryItem inventoryItem;
 
+    @ManyToOne
+    private Batch batch;
+
+    @ManyToOne
+    private UnitOfMeasure inputUnit;
+
+    private java.math.BigDecimal inputQuantity;
+
     private Integer expectedQuantity;
 
     private Integer receivedQuantity;

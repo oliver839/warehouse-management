@@ -5,6 +5,8 @@ import com.logistics.warehouse_management.model.ProjectAllocation;
 import com.logistics.warehouse_management.model.ProjectStatus;
 import com.logistics.warehouse_management.model.Tool;
 import com.logistics.warehouse_management.model.Warehouse;
+import com.logistics.warehouse_management.model.StockPosition;
+import com.logistics.warehouse_management.model.StockStatus;
 import com.logistics.warehouse_management.repository.InventoryItemRepository;
 import com.logistics.warehouse_management.repository.ProjectAllocationRepository;
 import com.logistics.warehouse_management.repository.ProjectRepository;
@@ -43,10 +45,9 @@ class ProjectServiceTests {
         Tool screws = new Tool();
         screws.setSku("TEST-SCREWS-001");
         screws.setName("Schrauben");
-        screws.setQuantityInStock(100);
-        screws.setReservedQuantity(0);
         screws.setSpacePerUnit(0.001);
         screws.setWarehouse(warehouse);
+        screws.getStockPositions().add(new StockPosition(null, screws, null, null, null, null, 100, 0, StockStatus.AVAILABLE, null));
         screws = inventoryItemRepository.save(screws);
 
         Project project = new Project();
@@ -62,13 +63,13 @@ class ProjectServiceTests {
 
         projectService.changeStatus(project.getId(), ProjectStatus.APPROVED);
         Tool reservedScrews = (Tool) inventoryItemRepository.findById(screws.getId()).orElseThrow();
-        assertEquals(20, reservedScrews.getReservedQuantity());
-        assertEquals(80, reservedScrews.getAvailableQuantity());
+        assertEquals(20, reservedScrews.getStockPositions().get(0).getReservedQuantity());
+        assertEquals(80, reservedScrews.getStockPositions().get(0).getQuantity() - reservedScrews.getStockPositions().get(0).getReservedQuantity());
 
         projectService.changeStatus(project.getId(), ProjectStatus.COMPLETED);
         Tool consumedScrews = (Tool) inventoryItemRepository.findById(screws.getId()).orElseThrow();
-        assertEquals(80, consumedScrews.getQuantityInStock());
-        assertEquals(0, consumedScrews.getReservedQuantity());
-        assertEquals(80, consumedScrews.getAvailableQuantity());
+        assertEquals(80, consumedScrews.getStockPositions().get(0).getQuantity());
+        assertEquals(0, consumedScrews.getStockPositions().get(0).getReservedQuantity());
+        assertEquals(80, consumedScrews.getStockPositions().get(0).getQuantity() - consumedScrews.getStockPositions().get(0).getReservedQuantity());
     }
 }

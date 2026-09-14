@@ -60,6 +60,10 @@ public class DeliveryNoteController {
     @GetMapping(value = "/{id}/label", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> label(@PathVariable Long id) {
         DeliveryNote note = deliveryNoteRepository.findById(id).orElseThrow();
+        if (note.getShippingShipmentId() == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.NOT_FOUND, "Noch nicht versendet — kein Label verfügbar");
+        }
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=versandlabel-" + id + ".pdf")
                 .contentType(MediaType.APPLICATION_PDF)
@@ -69,6 +73,10 @@ public class DeliveryNoteController {
     @GetMapping("/{id}/shipping-status")
     public Object shippingStatus(@PathVariable Long id) {
         DeliveryNote note = deliveryNoteRepository.findById(id).orElseThrow();
+        if (note.getShippingShipmentId() == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.NOT_FOUND, "Noch nicht versendet — kein Versandstatus verfügbar");
+        }
         return shippingProvider.getStatus(note.getShippingShipmentId());
     }
 }

@@ -6,6 +6,8 @@ import com.logistics.warehouse_management.model.ProjectAllocation;
 import com.logistics.warehouse_management.model.ProjectStatus;
 import com.logistics.warehouse_management.model.Tool;
 import com.logistics.warehouse_management.model.Warehouse;
+import com.logistics.warehouse_management.model.StockPosition;
+import com.logistics.warehouse_management.model.StockStatus;
 import com.logistics.warehouse_management.repository.InventoryItemRepository;
 import com.logistics.warehouse_management.repository.ProjectAllocationRepository;
 import com.logistics.warehouse_management.repository.ProjectRepository;
@@ -67,9 +69,14 @@ public class CsvImportService {
                 item.setSku(sku);
                 item.setBarcode(barcode);
                 item.setName(value(record, "name"));
-                item.setQuantityInStock(Integer.valueOf(value(record, "quantityInStock")));
                 item.setSpacePerUnit(Double.valueOf(value(record, "spacePerUnit")));
                 item.setWarehouse(warehouse);
+                StockPosition position = new StockPosition();
+                position.setInventoryItem(item);
+                position.setQuantity(Integer.valueOf(value(record, "quantityInStock")));
+                position.setReservedQuantity(0);
+                position.setStatus(StockStatus.AVAILABLE);
+                item.getStockPositions().add(position);
                 itemRepository.save(item);
                 imported++;
             } catch (RuntimeException exception) {

@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: warehouse-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-warehouse}
+      POSTGRES_USER: ${POSTGRES_USER:-warehouse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-backup:
+    image: postgres:16-alpine
+    container_name: warehouse-postgres-backup
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB:-warehouse}
+      PGUSER: ${POSTGRES_USER:-warehouse}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+    volumes:
+      - postgres-backups:/backups
+    entrypoint: ["/bin/sh", "-c"]
+    command: >-
+      "set -eu;
+      while true; do
+        file=/backups/warehouse-$$(date -u +%Y%m%dT%H%M%SZ).dump;
+        pg_dump --format=custom --file=$$file;
+        find /backups -type f -name '*.dump' -mtime +14 -delete;
+        sleep $$BACKUP_INTERVAL_SECONDS;
+      done"
+
+volumes:
+  postgres-data:
+  postgres-backups:

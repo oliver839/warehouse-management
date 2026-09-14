@@ -65,8 +65,8 @@ public class ItemController {
         }
         InventoryItem item = createItemByType(itemRequest.type());
         applyRequest(item, itemRequest);
-        item.setQuantityInStock(0);
         item = inventoryItemRepository.save(item);
+        ensureRequestedBin(item, itemRequest);
         inventoryService.adjustStock(item, itemRequest.quantityInStock(),
             InventoryTransactionReason.MANUAL_ADJUSTMENT, "ITEM", item.getId());
         return ResponseEntity.ok(item);
@@ -91,6 +91,7 @@ public class ItemController {
         }
         applyRequest(item, itemRequest);
         item = inventoryItemRepository.save(item);
+        ensureRequestedBin(item, itemRequest);
         inventoryService.adjustStock(item, requestedQuantity,
             InventoryTransactionReason.MANUAL_ADJUSTMENT, "ITEM", item.getId());
         return ResponseEntity.ok(item);
@@ -134,17 +135,6 @@ public class ItemController {
         item.setHeight(request.height());
         item.setWarehouse(warehouse);
 
-        if (request.binLocationId() != null) {
-            BinLocation bin = storageLocationService.getActiveBin(request.binLocationId());
-            if (!warehouse.getId().equals(bin.getWarehouse().getId())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "Der Lagerplatz gehört zu einem anderen Lager.");
-            }
-            storageLocationService.ensureCapacity(bin, item,
-                request.quantityInStock() == null ? 0 : request.quantityInStock());
-            item.setBinLocation(bin);
-        }
-
         if (item instanceof Tool tool) {
             tool.setSerialNumber(request.serialNumber());
             tool.setCalibrated(Boolean.TRUE.equals(request.isCalibrated()));
@@ -153,6 +143,16 @@ public class ItemController {
             material.setMaterialType(request.materialType());
             material.setUnit(request.unit());
         }
+    }
+
+    private void ensureRequestedBin(InventoryItem item, ItemRequest request) {
+        if (request.binLocationId() == null) return;
+        BinLocation bin = storageLocationService.getActiveBin(request.binLocationId());
+        if (!item.getWarehouse().getId().equals(bin.getWarehouse().getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Der Lagerplatz gehört zu einem anderen Lager.");
+        }
+        storageLocationService.ensureCapacity(bin, item, request.quantityInStock());
+        inventoryService.ensurePosition(item, bin);
     }
 
     private ResponseEntity<String> validateIdentity(ItemRequest request, Long currentItemId) {

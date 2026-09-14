@@ -11,6 +11,8 @@ import com.logistics.warehouse_management.model.StorageLevel;
 import com.logistics.warehouse_management.model.Tool;
 import com.logistics.warehouse_management.model.Warehouse;
 import com.logistics.warehouse_management.model.WarehouseZone;
+import com.logistics.warehouse_management.model.StockPosition;
+import com.logistics.warehouse_management.model.StockStatus;
 import com.logistics.warehouse_management.repository.InventoryItemRepository;
 import com.logistics.warehouse_management.repository.InventoryTransactionRepository;
 import com.logistics.warehouse_management.repository.WarehouseRepository;
@@ -53,7 +55,6 @@ class GoodsReceiptServiceTests {
         Tool item = new Tool();
         item.setSku("RECEIPT-TEST-001");
         item.setName("Wareneingang Testartikel");
-        item.setQuantityInStock(0);
         item.setSpacePerUnit(0.5);
         item.setWarehouse(warehouse);
         item = inventoryItemRepository.save(item);
@@ -63,8 +64,10 @@ class GoodsReceiptServiceTests {
         receiptService.confirm(receipt.getId());
 
         Tool storedItem = (Tool) inventoryItemRepository.findById(item.getId()).orElseThrow();
-        assertEquals(3, storedItem.getQuantityInStock());
-        assertEquals(bin.getId(), storedItem.getBinLocation().getId());
+        StockPosition storedPosition = inventoryItemRepository.findById(item.getId()).orElseThrow()
+            .getStockPositions().stream().filter(position -> bin.getId().equals(position.getBinLocation().getId())).findFirst().orElseThrow();
+        assertEquals(3, storedPosition.getQuantity());
+        assertEquals(bin.getId(), storedPosition.getBinLocation().getId());
 
         InventoryTransaction transaction = transactionRepository
                 .findByInventoryItemIdOrderByTimestampDesc(item.getId()).get(0);

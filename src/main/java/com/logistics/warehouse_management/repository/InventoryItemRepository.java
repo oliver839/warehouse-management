@@ -9,8 +9,6 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, Lo
 
     List<InventoryItem> findByWarehouseId(Long warehouseId);
 
-    List<InventoryItem> findByBinLocationId(Long binLocationId);
-
     boolean existsBySkuIgnoreCase(String sku);
 
     java.util.Optional<InventoryItem> findBySkuIgnoreCase(String sku);
